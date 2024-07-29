@@ -12,6 +12,12 @@ data class Group(
     @Column(unique = true, nullable = false)
     val name: String,
 
+    @Column(unique = false, nullable = true)
+    val policy: String?,
+
+    @Column(unique = false, nullable = true)
+    val owner: String?,
+
     @ElementCollection
     @CollectionTable(name = "group_members", joinColumns = [JoinColumn(name = "group_id")])
     @Column(name = "user_id")

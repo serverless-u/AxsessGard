@@ -1,0 +1,55 @@
+= AxsessGard (AxG)
+
+== Description
+AxsessGard (AxG) is a REST application backed by a JPA database that manages access control lists. It provides a JWT-based authorization system for client-server interactions. AxG is designed to work in conjunction with third-party applications to provide fine-grained access control.
+
+== Current Status
+AxG is currently a work in progress. This README provides an overview of the core concepts and functionality. Installation guides and more detailed documentation will be available in future releases.
+
+== Technology Stack
+- Kotlin
+- Spring Boot
+- JPA (Java Persistence API)
+
+== Features
+- JWT-based authorization
+- Attribute-based access control (ABAC)
+- Policy-based permissions
+- Integration with existing application servers
+- Database-agnostic (supports any database compatible with JPA)
+
+== How It Works
+1. A client requests access to a resource from a third-party application server.
+2. The application server authenticates the user (AxG does not handle authentication).
+3. The application server creates a signed JWT containing:
+- User ID
+- Policy ID controlling access to the resource
+- List of user roles
+4. The application server directs the client to AxG for authorization.
+5. AxG verifies the JWT signature and checks the provided information against its database.
+6. AxG issues a signed JWT containing all actions the user is allowed to perform.
+7. The client can use this JWT to access permitted resources on the application server.
+
+== API Reference
+AxG provides a single endpoint:
+- **GET** request
+- The Authorization header should contain the JWT from the third-party application
+
+== Configuration
+Minimal configuration is required. Third-party applications need to be onboarded so that their public keys are known to AxG for JWT verification.
+
+== Security Considerations
+- All JWTs in the system are signed, including AxG's responses.
+- AxG does not handle user authentication; this responsibility lies with the third-party application.
+
+== Future Plans
+- Token expiration features
+- Additional documentation, including installation guides
+- Performance optimizations
+
+== License
+Apache License 2.0
+
+'''
+
+AxsessGard is under active development. Features, API, and documentation are subject to change. For the latest updates or to contribute to the project, please contact the development team.

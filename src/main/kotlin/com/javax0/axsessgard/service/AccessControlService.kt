@@ -1,5 +1,6 @@
 package com.javax0.axsessgard.service
 
+import com.javax0.axsessgard.model.ACL
 import com.javax0.axsessgard.model.PrincipalType
 import com.javax0.axsessgard.repository.ACLRepository
 import com.javax0.axsessgard.repository.GroupRepository
@@ -25,8 +26,12 @@ class AccessControlService(
         }
     }
 
+    fun acl(id: String) : ACL? {
+        return aclRepository.findByName(id)
+    }
+
     fun permissions(userId: String, roles: List<String>, aclName: String): List<String> {
-        val allPermissions = mutableListOf<String>()
+        val allPermissions = mutableSetOf<String>()
 
         val acl = aclRepository.findByName(aclName) ?: return emptyList()
 
@@ -52,6 +57,6 @@ class AccessControlService(
                 }
             }
         }
-        return allPermissions
+        return allPermissions.toList()
     }
 }

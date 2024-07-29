@@ -22,7 +22,6 @@ repositories {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    //implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("com.auth0:java-jwt:4.4.0")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78")
@@ -53,4 +52,23 @@ tasks.withType<JavaCompile> {
 tasks.withType<JavaCompile>().configureEach {
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()
+}
+
+// This task will copy all runtime dependencies to build/libs/lib
+tasks.register<Copy>("copyRuntimeDependencies") {
+    from(configurations.runtimeClasspath)
+    into("build/libs/lib")
+}
+
+// Ensure the copyRuntimeDependencies task runs before the build task
+tasks.build {
+    dependsOn("copyRuntimeDependencies")
+}
+
+// Configure the jar task
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = "com.javax0.axsessgard.AxsessgardApplicationKt"
+        attributes["Class-Path"] = configurations.runtimeClasspath.get().joinToString(" ") { "lib/${it.name}" }
+    }
 }

@@ -12,6 +12,12 @@ data class ACL(
     @Column(unique = true, nullable = false)
     val name: String,
 
+    @Column(unique = false, nullable = true)
+    val policy: String?,
+
+    @Column(unique = false, nullable = true)
+    val owner: String?,
+
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
     @JoinColumn(name = "acl_id")
     val aces: MutableSet<ACE> = mutableSetOf()
