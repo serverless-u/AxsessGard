@@ -2,9 +2,9 @@ package com.javax0.axsessgard.controller
 
 import com.auth0.jwt.JWT
 import com.google.gson.Gson
-import com.javax0.axsessgard.initializer.KnownApplications
 import com.javax0.axsessgard.service.AccessControlService
 import com.javax0.axsessgard.service.JwtService
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -44,6 +44,7 @@ class ApiController(
                 .withIssuedAt(Instant.now())
                 .withExpiresAt(Instant.now().plusSeconds(ttl.toLong()))
                 .withSubject(jwt.subject)
+                .withClaim("policy", policy)
                 .withClaim("permissions", permissions)
         )
     }
@@ -54,33 +55,56 @@ class ApiController(
      *
      * If the acl is not protected by any policy, then anyone can read it, even unauthenticated users.
      *
-     * If the acl is protected by a policy, then the user has to provide a JWT token signed by a trusted application
-     * to identify the user.
-     * The service checks the policy and if the user has `read` right then it will retun the content of the ACL.
+     * If the acl is protected by a policy, then the user has to be identified.
+     * The service checks the policy and if the user has `read` right then it will return the content of the ACL.
      *
      */
     @GetMapping("/axsg/acl/{id}")
-    fun getAxl(@RequestHeader("Authorization") authHeader: String?, @PathVariable id: String): String {
+    fun getAxl(
+        @RequestHeader("x-user-id", required = false) userId: String?,
+        @RequestHeader("Authorization", required = false) authHeader: String?,
+        @PathVariable id: String
+    ): String {
         val acl = accessControlService.acl(id) ?: throw ApplicationException(HttpStatus.NOT_FOUND, "ACL $id not found")
-        val permissions =
-            if (acl.policy != null) {
-                if (authHeader == null) {
-                    throw ApplicationException(HttpStatus.UNAUTHORIZED, "Authorization header is missing")
-                }
-                val jwtString = authHeader.replace(BEARER_PATTERN, "")
-                val issuer = JWT.decode(jwtString).issuer
-                if (!KnownApplications.trusted.contains(issuer)) {
-                    throw ApplicationException(HttpStatus.UNAUTHORIZED, "Issuer $issuer is not trusted")
-                }
-                val jwt = jwtService.verify(jwtString)
-                val subject = jwt.subject
-                val roles = if (acl.owner == subject) listOf("owner") else listOf()
-                accessControlService.permissions(jwt.subject, roles, acl.policy)
-            } else listOf("read")
+        val policy = acl.policy
+        val permissions : List<String>
+        if (policy != null) {
+            if (userId == null) throw ApplicationException(HttpStatus.UNAUTHORIZED, "Unknown user")
+            if (authHeader == null) {
+                val roles = if (acl.owner == userId) listOf("owner") else listOf()
+                throw RequestAuthorization("", policy, roles)
+            }
+            val jwtString = authHeader.replace(BEARER_PATTERN, "")
+            val jwt = jwtService.verify(jwtString)
+            if( jwt.subject != userId ) throw ApplicationException(HttpStatus.UNAUTHORIZED, "Access denied, user mismatch")
+            if( jwt.getClaim("policy").asString() != policy ) throw ApplicationException(HttpStatus.UNAUTHORIZED, "Access denied, policy mismatch")
+            permissions = jwt.getClaim("permissions")?.asList(String::class.java) ?: listOf()
+        } else permissions = listOf("read")
         if (permissions.contains("read")) {
             return Gson().toJson(acl)
         } else {
-            throw ApplicationException(HttpStatus.UNAUTHORIZED,"Access denied")
+            throw ApplicationException(HttpStatus.UNAUTHORIZED, "Access denied")
         }
+    }
+
+
+    @GetMapping("/echo")
+    fun echoRequest(@RequestHeader headers: Map<String, String>, request: HttpServletRequest): Map<String, Any> {
+        val requestInfo = mutableMapOf<String, Any>()
+
+        // Add request headers
+        val headerMap = headers.mapKeys { it.key.lowercase() } // Normalize header keys to lowercase
+        requestInfo["headers"] = headerMap
+
+        // Add request method and URL
+        requestInfo["method"] = request.method
+        requestInfo["requestURL"] = request.requestURL.toString()
+        requestInfo["requestURI"] = request.requestURI
+
+        // Add query parameters
+        val queryParams = request.parameterMap.mapValues { it.value.joinToString(", ") }
+        requestInfo["queryParams"] = queryParams
+
+        return requestInfo
     }
 }

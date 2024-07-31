@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Testing Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-bottom: 10px;
+        }
+        input, select, button {
+            padding: 10px;
+            margin-top: 10px;
+            margin-right: 10px;
+        }
+        #urlInput {
+            width: calc(100% - 22px); /* Adjust width to account for padding and border */
+        }
+        #headersInput {
+            height: 100px; /* Slightly smaller for headers input */
+        }
+    </style>
+</head>
+<body>
+<h1>API Testing Tool</h1>
+<label for="urlInput">Enter URL:</label>
+<input type="text" id="urlInput" placeholder="http://localhost:3000/api">
+<br>
+<label for="jsonInput">Enter JSON:</label>
+<textarea id="jsonInput" placeholder='{"key": "value"}'></textarea>
+<br>
+<label for="headersInput">Enter Headers:</label>
+<textarea id="headersInput" placeholder='Content-Type: application/json\nAuthorization: Bearer token'></textarea>
+<br>
+<label for="methodSelect">Select Method:</label>
+<select id="methodSelect">
+    <option value="GET">GET</option>
+    <option value="POST">POST</option>
+    <option value="PUT">PUT</option>
+    <option value="DELETE">DELETE</option>
+</select>
+<br>
+<button onclick="sendRequest()">Send Request</button>
+<h2>Response:</h2>
+<pre id="responseOutput"></pre>
+
+<script>
+    function parseHeaders(headersInput) {
+        const headers = {};
+        const lines = headersInput.split('\n');
+        lines.forEach(line => {
+            const [key, value] = line.split(': ');
+            if (key && value) {
+                headers[key.trim()] = value.trim();
+            }
+        });
+        return headers;
+    }
+
+    function sendRequest() {
+        const url = document.getElementById('urlInput').value;
+        const jsonInput = document.getElementById('jsonInput').value;
+        const method = document.getElementById('methodSelect').value;
+        const headersInput = document.getElementById('headersInput').value;
+
+        let headers = parseHeaders(headersInput);
+        headers['Content-Type'] = 'application/json'; // Ensure Content-Type is set
+
+        let requestOptions = {
+            method: method,
+            headers: headers
+        };
+
+        if (method !== 'GET') {
+            try {
+                requestOptions.body = JSON.stringify(JSON.parse(jsonInput));
+            } catch (error) {
+                alert('Invalid JSON');
+                return;
+            }
+        }
+
+        fetch(url, requestOptions)
+            .then(response => {
+                // Extract headers and body from the response
+                const responseHeaders = Array.from(response.headers.entries());
+                const headersString = responseHeaders.map(([key, value]) => `${key}: ${value}`).join('\n');
+
+                return response.json().then(data => {
+                    // Display headers and body
+                    document.getElementById('responseOutput').textContent =
+                        `Headers:\n${headersString}\n\nBody:\n${JSON.stringify(data, null, 2)}`;
+                }).catch(() => {
+                    // If JSON parsing fails, still show headers and raw response
+                    return response.text().then(text => {
+                        document.getElementById('responseOutput').textContent =
+                            `Headers:\n${headersString}\n\nBody:\n${text}`;
+                    });
+                });
+            })
+            .catch(error => {
+                document.getElementById('responseOutput').textContent = `Error: ${error.message}`;
+            });
+    }
+</script>
+</body>
+</html>

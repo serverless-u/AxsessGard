@@ -1,6 +1,7 @@
 package com.javax0.axsessgard.utils
 
 const val AXSG_CONFIG_DIR = "AXSG_CONFIG_DIR"
+const val AXSG_INIT_DATA = "AXSG_INIT_DATA"
 
 class Configuration {
 

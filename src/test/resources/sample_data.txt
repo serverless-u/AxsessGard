@@ -3,7 +3,18 @@ ACE:USER:user1:read
 ACE:ROLE:ROLE_ADMIN:read,write
 ACE:GROUP:developers:read,write,delete
 
+ACL:ReadOnlyAccess1
+ACE:USER:user1:read
+ACE:ROLE:ROLE_ADMIN:read,write
+ACE:GROUP:developers:read,write,delete
+
 ACL:FullAccess
+POLICY:ReadOnlyAccess
+ACE:USER:user2:read,write,delete
+ACE:ROLE:ROLE_SUPERADMIN:read,write, delete,admin
+
+ACL:DummyAccess
+POLICY:ReadOnlyAccess1
 ACE:USER:user2:read,write,delete
 ACE:ROLE:ROLE_SUPERADMIN:read,write, delete,admin
 

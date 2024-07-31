@@ -3,6 +3,7 @@ package com.javax0.axsessgard.util
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.javax0.axsessgard.utils.AXSG_CONFIG_DIR
+import com.javax0.axsessgard.utils.AXSG_INIT_DATA
 import com.javax0.axsessgard.utils.AlgorithmFactory
 import java.security.KeyFactory
 import java.security.spec.PKCS8EncodedKeySpec
@@ -35,6 +36,7 @@ class JwtTestUtil {
             System.setProperty("AXSG_ALGO", "ECDSA256")
 
             System.setProperty(AXSG_CONFIG_DIR, "src/test/resources/config")
+            System.setProperty(AXSG_INIT_DATA, "src/test/resources/sample_data.txt")
 
             val issuer1PublicKeyPem =
                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEo2SGwd5psDsfx1gwirzZP+udK1FlWl7t3Ho7tnZqJ+96oOgW/w3nKrXGU/SYbqOgdpB8D8A+Y4MqfCjmstOLFg=="

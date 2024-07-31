@@ -3,6 +3,7 @@ package com.javax0.axsessgard.initializer
 import com.auth0.jwt.algorithms.Algorithm
 import com.javax0.axsessgard.utils.AlgorithmFactory
 import com.javax0.axsessgard.utils.Configuration
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.CommandLineRunner
 import org.springframework.stereotype.Component
 import java.io.File
@@ -11,14 +12,38 @@ import java.security.interfaces.ECPublicKey
 import java.security.spec.X509EncodedKeySpec
 import java.util.*
 
+/**
+ * Read the files from the applications folder under the configuration directory and initialize the known applications.
+ * Each application should have a unique ID, an algorithm type, an algorithm, and a public key.
+ * Each of these values are specified in the file in the format:
+ *
+ * ```
+ *   KEY: value
+ * ```
+ *
+ * The possible keys are:
+ *
+ * * `ID` is the name of the application
+ * * `ALGO` is the algorithm to use, default is `ECDSA256` or the algorithm specified the last time in the given file
+ * * `ALGO_TYPE` is the type of the algorithm, default is `EC` or the algorithm specified the last time in the given file
+ * * `KEY` is the public key of application base 64 encoded
+ * * `TRUSTED` if the application is trusted to ccept the authenticity of the user holding the signed JWT.
+ *   This key does not have a `:` after it.
+ *
+ * Lines starting with `//`, `#` and empty lines are ignored.
+ */
 @Component
-class KnownApplications : CommandLineRunner {
+class KnownApplications (private val algorithm: Algorithm): CommandLineRunner {
     companion object {
         val algorithms = mutableMapOf<String, Algorithm>()
         val trusted = mutableSetOf<String>()
     }
+    @Value("\${axsg.issuer}")
+    private lateinit var issuer: String
 
     override fun run(vararg args: String?) {
+        trusted.add(issuer)
+        algorithms[issuer] = algorithm
         val file = File(Configuration.DIRECTORY, "applications")
         file.listFiles()?.iterator()?.forEach {
             it.useLines(Charsets.UTF_8) { lines ->
