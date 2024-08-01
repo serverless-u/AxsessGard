@@ -1,14 +1,9 @@
 ACL:ReadOnlyAccess
-ACE:USER:user1:read
-ACE:ROLE:ROLE_ADMIN:read,write
-ACE:GROUP:developers:read,write,delete
+ACE:user1:read
+ACE:ROLE_ADMIN:read,write
+ACE:developers:read,write,delete
 
 ACL:FullAccess
-ACE:USER:user2:read,write,delete
-ACE:ROLE:ROLE_SUPERADMIN:read,write, delete,admin
+ACE:user2:read,write,delete
+ACE:ROLE_SUPERADMIN:read,write, delete,admin
 
-GROUP:developers
-MEMBERS:user1, user3
-
-GROUP:admins
-MEMBER:user2

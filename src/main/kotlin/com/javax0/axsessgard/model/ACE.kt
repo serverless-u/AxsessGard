@@ -13,16 +13,9 @@ data class ACE(
     @Column(nullable = false)
     val principalId: String,
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    val principalType: PrincipalType,
-
     @ElementCollection
     @CollectionTable(name = "ace_operations", joinColumns = [JoinColumn(name = "ace_id")])
     @Column(name = "operation")
     val operations: MutableSet<String> = mutableSetOf(),
 )
 
-enum class PrincipalType {
-    USER, ROLE, GROUP
-}

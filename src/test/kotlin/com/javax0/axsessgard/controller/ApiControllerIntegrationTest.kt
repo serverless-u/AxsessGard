@@ -2,20 +2,24 @@ package com.javax0.axsessgard
 
 import com.auth0.jwt.JWT
 import com.google.gson.Gson
+import com.javax0.axsessgard.model.ACE
 import com.javax0.axsessgard.model.ACL
 import com.javax0.axsessgard.util.JwtTestUtil
 import com.javax0.axsessgard.util.TestContextInitializer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
-import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpMethod
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.test.context.ContextConfiguration
+import org.springframework.util.MultiValueMap
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URI
 import kotlin.reflect.jvm.javaType
 import kotlin.reflect.typeOf
 
@@ -26,22 +30,14 @@ class ApiControllerIntegrationTest {
     @LocalServerPort
     private var port: Int = 0
 
-    @Autowired
-    private lateinit var restTemplate: TestRestTemplate
-
     @Test
     fun testGetPermissions1() {
         val testToken = JwtTestUtil.createTestToken("issuer1", "user1", "ReadOnlyAccess", listOf("ROLE_USER"))
 
-        val headers = HttpHeaders()
-        headers.set("Authorization", "Bearer $testToken")
-        val entity = HttpEntity<String>(headers)
-
-        val response = restTemplate.exchange(
+        val response = get(
             "http://localhost:$port/axsg/permissions",
-            HttpMethod.GET,
-            entity,
-            String::class.java
+            headers = mapOf("Authorization" to "Bearer $testToken"),
+            user = null
         )
 
         assertThat(response.statusCode.is2xxSuccessful).isTrue()
@@ -54,15 +50,10 @@ class ApiControllerIntegrationTest {
 
     @Test
     fun `Get an ACL which is not protected by any other ACL`() {
-        val headers = HttpHeaders()
-        headers.set("X-User-ID", "user1")
-        val entity = HttpEntity<String>(headers)
 
-        val response = restTemplate.exchange(
+        val response = get(
             "http://localhost:$port/axsg/acl/ReadOnlyAccess",
-            HttpMethod.GET,
-            entity,
-            String::class.java
+            headers = mapOf("X-User-ID" to "user1")
         )
 
         assertThat(response.statusCode.is2xxSuccessful).isTrue()
@@ -71,11 +62,11 @@ class ApiControllerIntegrationTest {
             Gson().fromJson(
                 "{\"id\":1,\"name\":\"ReadOnlyAccess\"," +
                         "\"aces\":[" +
-                        "{\"id\":1,\"principalId\":\"user1\",\"principalType\":\"USER\"," +
+                        "{\"id\":1,\"principalId\":\"user1\"," +
                         "\"operations\":[\"read\"]}," +
-                        "{\"id\":3,\"principalId\":\"developers\",\"principalType\":\"GROUP\"," +
+                        "{\"id\":3,\"principalId\":\"developers\"," +
                         "\"operations\":[\"read\",\"write\",\"delete\"]}," +
-                        "{\"id\":2,\"principalId\":\"ROLE_ADMIN\",\"principalType\":\"ROLE\",\"operations\":[\"read\",\"write\"]}]}",
+                        "{\"id\":2,\"principalId\":\"ROLE_ADMIN\",\"operations\":[\"read\",\"write\"]}]}",
                 ACL::class.java
             )
         )
@@ -84,20 +75,71 @@ class ApiControllerIntegrationTest {
 
     private fun get(
         url: String,
-        user: String = "user1",
+        user: String? = "user1",
         headers: Map<String, String> = mapOf()
     ): ResponseEntity<String> {
-        val httpHeaders = HttpHeaders()
-        httpHeaders.set("X-User-ID", user)
-        headers.forEach { (k, v) -> httpHeaders.set(k, v) }
-
-        return restTemplate.exchange(
-            url,
-            HttpMethod.GET,
-            HttpEntity<String>(httpHeaders),
-            String::class.java
-        )
+        return send(url, user, headers, null, "GET")
     }
+
+
+    private fun put(
+        url: String,
+        user: String? = "user1",
+        headers: Map<String, String> = mapOf(),
+        acl: ACL
+    ): ResponseEntity<String> {
+        return send(url, user, headers, acl, "PUT")
+    }
+
+    private fun post(
+        url: String,
+        user: String? = "user1",
+        headers: Map<String, String> = mapOf(),
+        acl: ACL
+    ): ResponseEntity<String> {
+        return send(url, user, headers, acl, "POST")
+    }
+
+
+    private fun send(
+        url: String,
+        user: String? = "user1",
+        headers: Map<String, String> = mapOf(),
+        acl: ACL?,
+        method: String = "POST"
+    ): ResponseEntity<String> {
+        val connection = URI(url).toURL().openConnection() as HttpURLConnection
+
+        connection.requestMethod = method
+        connection.doOutput = true
+
+        // Set headers
+        if (user != null) {
+            connection.setRequestProperty("X-User-ID", user)
+        }
+        headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+
+        if (acl != null) {
+            // Write ACL to request body
+            connection.setRequestProperty("Content-Type", "application/json")
+            val json = Gson().toJson(acl)
+            val writer = OutputStreamWriter(connection.outputStream)
+            writer.write(json) // Assuming ACL has a proper toString() method
+            writer.flush()
+            writer.close()
+        }
+        // Get response
+        val responseCode = connection.responseCode
+        val responseBody =
+            if (responseCode == 200) BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() } else ""
+
+        connection.disconnect()
+        val responseHeaders: MultiValueMap<String, String> = HttpHeaders()
+        connection.headerFields.filter { it.key != null }
+            .forEach { (k, v) -> responseHeaders.addAll(k, v) }
+        return ResponseEntity(responseBody, responseHeaders, HttpStatus.valueOf(responseCode))
+    }
+
 
     private fun assert4XX(response1: ResponseEntity<String>) {
         assertThat(response1.statusCode.is4xxClientError).isTrue()
@@ -107,10 +149,14 @@ class ApiControllerIntegrationTest {
         assertThat(response2.statusCode.is2xxSuccessful).isTrue()
     }
 
-    private inline fun <reified T> assertResponse(response3: ResponseEntity<String>, expected: String) {
-        val acl = Gson().fromJson<T>(response3.body, typeOf<T>().javaType)
-        assertThat(acl).isEqualTo(
-            Gson().fromJson<T>(expected, typeOf<T>().javaType)
+    private fun assertACL(response3: ResponseEntity<String>, expected: String) {
+        val acl = Gson().fromJson(response3.body, ACL::class.java)
+        val maskedAcl = acl.copy(
+            id = 0,
+            aces = acl.aces.map { it.copy(id = 0) }.toMutableSet()
+        )
+        assertThat(maskedAcl).isEqualTo(
+            Gson().fromJson(expected, ACL::class.java)
         )
     }
 
@@ -138,13 +184,13 @@ class ApiControllerIntegrationTest {
             headers = mapOf("Authorization" to "Bearer ${response2.body}")
         )
         assert2XX(response3)
-        assertResponse<ACL>(
+        assertACL(
             response3,
-            "{\"id\":2,\"name\":\"FullAccess\", \"policy\": \"ReadOnlyAccess\", " +
+            "{\"id\":0,\"name\":\"FullAccess\", \"policy\": \"ReadOnlyAccess\", " +
                     "\"aces\":[" +
-                    "{\"id\":4,\"principalId\":\"user2\",\"principalType\":\"USER\"," +
+                    "{\"id\":0,\"principalId\":\"user2\"," +
                     "\"operations\":[\"read\",\"write\",\"delete\"]}," +
-                    "{\"id\":5,\"principalId\":\"ROLE_SUPERADMIN\",\"principalType\":\"ROLE\"," +
+                    "{\"id\":0,\"principalId\":\"ROLE_SUPERADMIN\"," +
                     "\"operations\":[\"read\",\"admin\",\"write\",\"delete\"]}]}"
         )
     }
@@ -215,23 +261,156 @@ class ApiControllerIntegrationTest {
         assert4XX(response3)
     }
 
+    @Test
+    fun `Post a new ACL and then Update it using PUT`() {
+        val response1 = post(
+            "http://localhost:$port/axsg/acl",
+            "user2",
+            acl = ACL(
+                name = "NewAccess", policy = "ReadOnlyAccess", owner = "user1", aces = mutableSetOf(
+                    ACE(
+                        principalId = "user2",
+                        operations = mutableSetOf("read", "write", "delete")
+                    ),
+                    ACE(
+                        principalId = "developers",
+                        operations = mutableSetOf("read", "write")
+                    ),
+                )
+            )
+        )
+        assert4XX(response1)
+        val authRequest = getRequestAuthorization(response1)
+        val location = getLocation(response1)
+
+        val response2 = get(
+            location,
+            "user1",
+            headers = mapOf("Authorization" to "Bearer $authRequest")
+        )
+        assert2XX(response2)
+
+        val response3 = post(
+            "http://localhost:$port/axsg/acl",
+            "user2",
+            headers = mapOf("Authorization" to "Bearer ${response2.body}"),
+            acl = ACL(
+                name = "NewAccess", policy = "FullAccess", owner = "user1", aces = mutableSetOf(
+                    ACE(
+                        principalId = "user2",
+                        operations = mutableSetOf("read", "write", "delete", "horwardan")
+                    ),
+                    ACE(
+                        principalId = "developers",
+                        operations = mutableSetOf("read", "write")
+                    ),
+                )
+            )
+        )
+        assert2XX(response3)
+
+        val response4 = put(
+            "http://localhost:$port/axsg/acl/NewAccess",
+            "user2",
+            headers = mapOf("Authorization" to "Bearer ${response2.body}"),
+            acl = ACL(
+                name = "NewAccess", policy = "ReadOnlyAccess", owner = "user1", aces = mutableSetOf(
+                    ACE(
+                        principalId = "user2",
+                        operations = mutableSetOf("read", "write", "delete")
+                    ),
+                    ACE(
+                        principalId = "developers",
+                        operations = mutableSetOf("read", "write")
+                    ),
+                )
+            )
+        )
+
+        assert4XX(response4)
+        val authRequest1 = getRequestAuthorization(response4)
+        val location1 = getLocation(response4)
+
+        val response5 = get(
+            location1,
+            "user1",
+            headers = mapOf("Authorization" to "Bearer $authRequest1")
+        )
+        assert2XX(response5)
+
+        val response6 = put(
+            "http://localhost:$port/axsg/acl/NewAccess",
+            "user2",
+            headers = mapOf("Authorization" to "Bearer ${response5.body}"),
+            acl = ACL(
+                name = "NewAccess", policy = "ReadOnlyAccess", owner = "user1", aces = mutableSetOf(
+                    ACE(
+                        principalId = "user2",
+                        operations = mutableSetOf("read", "write", "delete", "horwarden")
+                    ),
+                    ACE(
+                        principalId = "developers",
+                        operations = mutableSetOf("read", "write")
+                    ),
+                )
+            )
+        )
+        assert2XX(response6)
+
+        val testToken = JwtTestUtil.createTestToken("issuer2", "user2", "NewAccess", listOf())
+
+        val response = get(
+            "http://localhost:$port/axsg/permissions",
+            headers = mapOf("Authorization" to "Bearer $testToken")
+        )
+
+        assertThat(response.statusCode.is2xxSuccessful).isTrue()
+
+        // Decode and verify the response JWT
+        val responseJwt = JWT.decode(response.body)
+        assertThat(responseJwt.subject).isEqualTo("user2")
+        assertThat(responseJwt.getClaim("permissions").asList(String::class.java)).contains("horwarden")
+
+
+    }
+
+    @Test
+    fun `Get Permission URL and JWT for POST`() {
+
+        val response = get("http://localhost:$port/axsg/post/acl")
+
+        assert4XX(response)
+        assertThat(getLocation(response)).isNotNull()
+    }
+
+    @Test
+    fun `Get Permission URL and JWT for PUT unprotected`() {
+
+        val response = get("http://localhost:$port/axsg/put/acl/ReadOnlyAccess")
+
+        assert2XX(response) // not protected
+    }
+
+    @Test
+    fun `Get Permission URL and JWT for PUT protected`() {
+
+        val response = get("http://localhost:$port/axsg/put/acl/FullAccess")
+
+        assert4XX(response)
+        assertThat(getLocation(response)).isNotNull()
+    }
+
 
     @Test
     fun testGetPermissions2() {
         val testToken = JwtTestUtil.createTestToken("issuer2", "user1", "ReadOnlyAccess", listOf("ROLE_USER"))
 
-        val headers = HttpHeaders()
-        headers.set("Authorization", "Bearer $testToken")
-        val entity = HttpEntity<String>(headers)
-
-        val response = restTemplate.exchange(
+        val response = get(
             "http://localhost:$port/axsg/permissions",
-            HttpMethod.GET,
-            entity,
-            String::class.java
+            headers = mapOf("Authorization" to "Bearer $testToken")
         )
 
-        assertThat(response.statusCode.is2xxSuccessful).isTrue()
+        assert2XX(response)
 
         // Decode and verify the response JWT
         val responseJwt = JWT.decode(response.body)
@@ -244,15 +423,9 @@ class ApiControllerIntegrationTest {
     fun testGetPermissionsFromDocker() {
         val testToken = JwtTestUtil.createTestToken("issuer2", "user1", "ReadOnlyAccess", listOf("ROLE_USER"))
 
-        val headers = HttpHeaders()
-        headers.set("Authorization", "Bearer $testToken")
-        val entity = HttpEntity<String>(headers)
-
-        val response = restTemplate.exchange(
+        val response = get(
             "http://localhost:8080/axsg/permissions",
-            HttpMethod.GET,
-            entity,
-            String::class.java
+            headers = mapOf("Authorization" to "Bearer $testToken")
         )
 
         assertThat(response.statusCode.is2xxSuccessful).isTrue()

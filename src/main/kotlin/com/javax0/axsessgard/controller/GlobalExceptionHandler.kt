@@ -68,8 +68,8 @@ class GlobalExceptionHandler(
                 .toUriString()
 
 
-
-        request.getHeader("x-user-id")?.let { userId ->
+        val userId = request.getHeader("x-user-id")
+        if (userId != null) {
             val errorResponse = ErrorResponse(
                 status = HttpStatus.UNAUTHORIZED.value(),
                 error = HttpStatus.UNAUTHORIZED.reasonPhrase,
@@ -110,7 +110,6 @@ class ApplicationException(
 ) : RuntimeException(message)
 
 class RequestAuthorization(
-    override val message: String,
     val policy: String,
     val roles: List<String>
-) : RuntimeException(message)
+) : RuntimeException("request authorization for $policy")

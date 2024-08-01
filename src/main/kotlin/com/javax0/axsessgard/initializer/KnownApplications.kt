@@ -27,8 +27,6 @@ import java.util.*
  * * `ALGO` is the algorithm to use, default is `ECDSA256` or the algorithm specified the last time in the given file
  * * `ALGO_TYPE` is the type of the algorithm, default is `EC` or the algorithm specified the last time in the given file
  * * `KEY` is the public key of application base 64 encoded
- * * `TRUSTED` if the application is trusted to ccept the authenticity of the user holding the signed JWT.
- *   This key does not have a `:` after it.
  *
  * Lines starting with `//`, `#` and empty lines are ignored.
  */
@@ -36,13 +34,11 @@ import java.util.*
 class KnownApplications (private val algorithm: Algorithm): CommandLineRunner {
     companion object {
         val algorithms = mutableMapOf<String, Algorithm>()
-        val trusted = mutableSetOf<String>()
     }
     @Value("\${axsg.issuer}")
     private lateinit var issuer: String
 
     override fun run(vararg args: String?) {
-        trusted.add(issuer)
         algorithms[issuer] = algorithm
         val file = File(Configuration.DIRECTORY, "applications")
         file.listFiles()?.iterator()?.forEach {
@@ -65,10 +61,6 @@ class KnownApplications (private val algorithm: Algorithm): CommandLineRunner {
 
                         line.startsWith("ALGO_TYPE:") -> {
                             algoType = line.substring(10).trim()
-                        }
-
-                        line.equals("TRUSTED") -> {
-                            trusted.add(id ?: throw IllegalStateException("ID not set for application"))
                         }
 
                         line.startsWith("KEY:") -> {
