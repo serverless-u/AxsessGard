@@ -2,10 +2,13 @@ package com.javax0.axsessgard.controller
 
 import com.auth0.jwt.JWT
 import com.google.gson.Gson
+import com.javax0.axsessgard.api.ApiApi
 import com.javax0.axsessgard.model.ACL
 import com.javax0.axsessgard.service.AccessControlService
 import com.javax0.axsessgard.service.JwtService
+import io.swagger.v3.oas.annotations.Parameter
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.validation.Valid
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -16,7 +19,7 @@ import java.time.Instant
 class ApiController(
     private val jwtService: JwtService,
     private val accessControlService: AccessControlService
-) {
+)  :ApiApi{
 
     companion object {
         private val BEARER_PATTERN = Regex("Bearer\\s+")
@@ -43,20 +46,20 @@ class ApiController(
      *
      */
     @GetMapping("/axsg/permissions")
-    fun getPermissions(@RequestHeader("Authorization") authHeader: String): String {
-        val jwtString = authHeader.replace(BEARER_PATTERN, "")
+    override fun getPermissions(@RequestHeader("Authorization") authorization: String): ResponseEntity<String> {
+        val jwtString = authorization.replace(BEARER_PATTERN, "")
         val jwt = jwtService.verify(jwtString)
         val policy = jwt.getClaim("policy").asString()
         val roles = jwt.getClaim("roles").asList(String::class.java)
         val permissions = accessControlService.permissions(jwt.subject, roles, policy)
-        return jwtService.sign(
+        return ResponseEntity(jwtService.sign(
             JWT.create().withIssuer(issuer)
                 .withIssuedAt(Instant.now())
                 .withExpiresAt(Instant.now().plusSeconds(ttl.toLong()))
                 .withSubject(jwt.subject)
                 .withClaim("policy", policy)
                 .withClaim("permissions", permissions)
-        )
+        ),HttpStatus.OK)
     }
 
     /**
@@ -92,24 +95,24 @@ class ApiController(
      *
      */
     @GetMapping("/axsg/acl/{name}")
-    fun getAcl(
-        @RequestHeader("x-user-id", required = false) userId: String?,
-        @RequestHeader("Authorization", required = false) authHeader: String?,
-        @PathVariable name: String
-    ): String {
+    override fun getAcl(
+        @PathVariable name: String,
+        @RequestHeader("x-user-id", required = false) xUserId: String?,
+        @RequestHeader("Authorization", required = false) authorization: String?
+    ): ResponseEntity<String> {
         val acl =
             accessControlService.acl(name) ?: throw ApplicationException(HttpStatus.NOT_FOUND, "ACL $name not found")
         val policy = acl.policy
         val permissions =
             if (policy != null) {
-                userId ?: throw ApplicationException(HttpStatus.UNAUTHORIZED, "Unknown user")
-                val roles = if (acl.owner == userId) listOf("owner") else listOf()
-                getPermissions(authHeader, userId, policy, roles)
+                xUserId ?: throw ApplicationException(HttpStatus.UNAUTHORIZED, "Unknown user")
+                val roles = if (acl.owner == xUserId) listOf("owner") else listOf()
+                getPermissions(authorization, xUserId, policy, roles)
             } else {
                 listOf("read")
             }
         if (permissions.contains("read")) {
-            return Gson().toJson(acl)
+            return ResponseEntity(Gson().toJson(acl),HttpStatus.OK)
         } else {
             throw ApplicationException(HttpStatus.UNAUTHORIZED, "Access denied")
         }
@@ -117,24 +120,24 @@ class ApiController(
 
 
     @GetMapping("/axsg/put/acl/{name}")
-    fun getPutPermission(
-        @RequestHeader("x-user-id", required = false) userId: String?,
-        @PathVariable name: String
+    override fun getPutPermission(
+        @PathVariable name: String,
+        @RequestHeader("x-user-id", required = false) xUserId: String?
     ): ResponseEntity<String> {
         val acl =
             accessControlService.acl(name) ?: throw ApplicationException(HttpStatus.NOT_FOUND, "ACL $name not found")
         val policy = acl.policy
             if (policy != null) {
-                userId ?: throw ApplicationException(HttpStatus.UNAUTHORIZED, "Unknown user")
-                val roles = if (acl.owner == userId) listOf("owner") else listOf()
+                xUserId ?: throw ApplicationException(HttpStatus.UNAUTHORIZED, "Unknown user")
+                val roles = if (acl.owner == xUserId) listOf("owner") else listOf()
                 throw RequestAuthorization(policy, roles)
             }
         return ResponseEntity<String>(HttpStatus.OK)
     }
 
     @GetMapping("/axsg/post/acl")
-    fun getPostPermission(
-        @RequestHeader("x-user-id", required = false) userId: String?
+     override fun getPostPermission(
+        @RequestHeader("x-user-id", required = false) xUserId: String?
     ): ResponseEntity<String> {
             throw RequestAuthorization("createAcl", listOf())
     }
@@ -145,38 +148,40 @@ class ApiController(
      * To do that, you have to use POST.
      */
     @PutMapping("/axsg/acl/{name}")
-    fun putAcl(
-        @RequestHeader("x-user-id", required = false) userId: String?,
-        @RequestHeader("Authorization", required = false) authHeader: String?,
+    override fun putAcl(
         @PathVariable name: String,
-        @RequestBody aclNew: ACL
-    ): String {
+        @Parameter(description = "", required = true) @Valid @RequestBody body: Any,
+        @RequestHeader("x-user-id", required = false) xUserId: String?,
+        @RequestHeader("Authorization", required = false) authorization: String?,
+    ): ResponseEntity<String> {
         val acl =
             accessControlService.acl(name) ?: throw ApplicationException(HttpStatus.NOT_FOUND, "ACL $name not found")
         val policy = acl.policy
         val permissions =
             if (policy != null) {
-                if (userId == null) throw ApplicationException(HttpStatus.UNAUTHORIZED, "Unknown user")
-                val roles = if (acl.owner == userId) listOf("owner") else listOf()
-                getPermissions(authHeader, userId, policy, roles)
+                if (xUserId == null) throw ApplicationException(HttpStatus.UNAUTHORIZED, "Unknown user")
+                val roles = if (acl.owner == xUserId) listOf("owner") else listOf()
+                getPermissions(authorization, xUserId, policy, roles)
             } else {
                 listOf("write")
             }
         permissions.contains("write") || throw ApplicationException(HttpStatus.UNAUTHORIZED, "Access denied")
+        val aclNew = Gson().fromJson(Gson().toJson(body), ACL::class.java)
         accessControlService.update(aclNew.copy(id = acl.id, name = name))
-        return ResponseEntity<String>(HttpStatus.OK).toString()
+        return ResponseEntity<String>(HttpStatus.OK)
     }
 
     @PostMapping("/axsg/acl")
-    fun postAcl(
-        @RequestHeader("x-user-id", required = false) userId: String?,
-        @RequestHeader("Authorization", required = false) authHeader: String?,
-        @RequestBody aclNew: ACL
-    ): String {
-        val permissions = getPermissions(authHeader, userId, "createAcl", listOf())
+    override fun postAcl(
+        @RequestBody body: Any,
+        @RequestHeader("x-user-id", required = false) xUserId: String?,
+        @RequestHeader("Authorization", required = false) authorization: String?,
+    ): ResponseEntity<String> {
+        val permissions = getPermissions(authorization, xUserId, "createAcl", listOf())
         permissions.contains("create") || throw ApplicationException(HttpStatus.UNAUTHORIZED, "Access denied")
+        val aclNew = Gson().fromJson(Gson().toJson(body), ACL::class.java)
         accessControlService.update(aclNew.copy(id = 0))
-        return ResponseEntity<String>(HttpStatus.OK).toString()
+        return ResponseEntity<String>(HttpStatus.OK)
     }
 
     @GetMapping("/echo")
