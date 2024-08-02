@@ -20,8 +20,6 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URI
-import kotlin.reflect.jvm.javaType
-import kotlin.reflect.typeOf
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ContextConfiguration(initializers = [TestContextInitializer::class])
@@ -71,6 +69,14 @@ class ApiControllerIntegrationTest {
             )
         )
 
+    }
+
+    private fun delete(
+        url: String,
+        user: String? = "user1",
+        headers: Map<String, String> = mapOf()
+    ): ResponseEntity<String> {
+        return send(url, user, headers, null, "DELETE")
     }
 
     private fun get(
@@ -267,7 +273,7 @@ class ApiControllerIntegrationTest {
             "http://localhost:$port/axsg/acl",
             "user2",
             acl = ACL(
-                name = "NewAccess", policy = "ReadOnlyAccess", owner = "user1", aces = mutableSetOf(
+                name = "NewAccess", policy = "FullAccess", owner = "user1", aces = mutableSetOf(
                     ACE(
                         principalId = "user2",
                         operations = mutableSetOf("read", "write", "delete")
@@ -364,7 +370,7 @@ class ApiControllerIntegrationTest {
             headers = mapOf("Authorization" to "Bearer $testToken")
         )
 
-        assertThat(response.statusCode.is2xxSuccessful).isTrue()
+        assert2XX(response)
 
         // Decode and verify the response JWT
         val responseJwt = JWT.decode(response.body)
@@ -373,6 +379,98 @@ class ApiControllerIntegrationTest {
 
 
     }
+
+    @Test
+    fun `Post a new ACL and then Delete it`() {
+        val response1 = post(
+            "http://localhost:$port/axsg/acl",
+            "user2",
+            acl = ACL(
+                name = "TemporaryAccess", policy = "FullAccess", owner = "user1", aces = mutableSetOf(
+                    ACE(
+                        principalId = "user2",
+                        operations = mutableSetOf("read", "write", "delete")
+                    ),
+                    ACE(
+                        principalId = "developers",
+                        operations = mutableSetOf("read", "write")
+                    ),
+                )
+            )
+        )
+        assert4XX(response1)
+        val authRequest = getRequestAuthorization(response1)
+        val location = getLocation(response1)
+
+        val response2 = get(
+            location,
+            "user1",
+            headers = mapOf("Authorization" to "Bearer $authRequest")
+        )
+        assert2XX(response2)
+
+        val response3 = post(
+            "http://localhost:$port/axsg/acl",
+            "user2",
+            headers = mapOf("Authorization" to "Bearer ${response2.body}"),
+            acl = ACL(
+                name = "TemporaryAccess", policy = "FullAccess", owner = "user1", aces = mutableSetOf(
+                    ACE(
+                        principalId = "user2",
+                        operations = mutableSetOf("read", "write", "delete", "horwardan")
+                    ),
+                    ACE(
+                        principalId = "developers",
+                        operations = mutableSetOf("read", "write")
+                    ),
+                )
+            )
+        )
+        assert2XX(response3)
+
+        val testToken = JwtTestUtil.createTestToken("issuer2", "user2", "TemporaryAccess", listOf())
+
+        val response = get(
+            "http://localhost:$port/axsg/permissions",
+            headers = mapOf("Authorization" to "Bearer $testToken")
+        )
+
+        assert2XX(response)
+
+        val response4 = delete(
+            "http://localhost:$port/axsg/acl/TemporaryAccess",
+            "user2",
+            headers = mapOf("Authorization" to "Bearer ${response2.body}"),
+        )
+
+        assert4XX(response4)
+        val authRequest1 = getRequestAuthorization(response4)
+        val location1 = getLocation(response4)
+
+        val response5 = get(
+            location1,
+            "user1",
+            headers = mapOf("Authorization" to "Bearer $authRequest1")
+        )
+        assert2XX(response5)
+
+        val response6 = delete(
+            "http://localhost:$port/axsg/acl/TemporaryAccess",
+            "user2",
+            headers = mapOf("Authorization" to "Bearer ${response5.body}"),
+        )
+        assert2XX(response6)
+
+        val testToken2 = JwtTestUtil.createTestToken("issuer2", "user2", "FullAccess", listOf())
+
+        val response0 = get(
+            "http://localhost:$port/axsg/acl/TemporaryAccess",
+            headers = mapOf("Authorization" to "Bearer $testToken2")
+        )
+
+        assert4XX(response0)
+    }
+
 
     @Test
     fun `Get Permission URL and JWT for POST`() {
@@ -416,6 +514,28 @@ class ApiControllerIntegrationTest {
         val responseJwt = JWT.decode(response.body)
         assertThat(responseJwt.subject).isEqualTo("user1")
         assertThat(responseJwt.getClaim("permissions").asList(String::class.java)).contains("read")
+    }
+
+
+    @Test
+    fun `list all ACLs`() {
+        val testToken = JwtTestUtil.createTestToken("issuer2", "user2", "listAcls", listOf())
+
+        val responseAuth = get(
+            "http://localhost:$port/axsg/permissions",
+            headers = mapOf("Authorization" to "Bearer $testToken")
+        )
+
+        val response = get(
+            "http://localhost:$port/axsg/acls/F",
+            "user2",
+            headers = mapOf("Authorization" to "Bearer ${responseAuth.body}")
+        )
+
+        assert2XX(response)
+        val json = Gson().fromJson(response.body, Map::class.java)
+        assertThat((json["acls"] as List<*>).size ).isEqualTo(1)
+        assertThat(((json["acls"] as List<*>)[0] as Map<*,*>)["name"]).isEqualTo("FullAccess")
     }
 
 

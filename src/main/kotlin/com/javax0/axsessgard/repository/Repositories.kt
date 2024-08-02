@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface ACLRepository : JpaRepository<ACL, Long> {
     fun findByName(name: String): ACL?
+    fun findByNameStartingWith(name: String): List<ACL>
 }
 
 interface ACERepository : JpaRepository<ACE, Long>

@@ -28,7 +28,7 @@ import java.util.*
  * * `ALGO_TYPE` is the type of the algorithm, default is `EC` or the algorithm specified the last time in the given file
  * * `KEY` is the public key of application base 64 encoded
  *
- * Lines starting with `//`, `#` and empty lines are ignored.
+ * Lines starting with `//`, `#`, `--` and empty lines are ignored.
  */
 @Component
 class KnownApplications (private val algorithm: Algorithm): CommandLineRunner {

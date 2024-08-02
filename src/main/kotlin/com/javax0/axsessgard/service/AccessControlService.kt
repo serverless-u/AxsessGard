@@ -9,8 +9,16 @@ class AccessControlService(
     private val aclRepository: ACLRepository
 ) {
 
+    fun find(query:String): List<ACL> {
+        return aclRepository.findByNameStartingWith(query)
+    }
+
     fun update(acl: ACL): ACL {
         return aclRepository.save(acl)
+    }
+
+    fun delete(acl: ACL) {
+        return aclRepository.delete(acl)
     }
 
     fun acl(id: String): ACL? {

@@ -16,6 +16,9 @@ ACE:ROLE_SUPERADMIN:read,write,delete,admin
 ACL:createAcl
 ACE:user2:create
 
+ACL:listAcls
+ACE:user2:list
+
 ACL:DummyAccess
 POLICY:ReadOnlyAccess1
 ACE:user2:read,write,delete
