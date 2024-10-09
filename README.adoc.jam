@@ -93,7 +93,7 @@ The set of role identifiers and the user name are taken into account calculating
 A user has a permission for an action `A` if there is an ACE in the ACL that
 
 * has the user's name or a role listed in the requesting JWT in the name field, and
-* the action `A` in the actions field.
+* the action `A` in the action field.
 
 It is the responsibility of the 3^rd^ party application:
 
@@ -106,20 +106,13 @@ It is the responsibility of the 3^rd^ party application:
 * Identify the list of roles that the user has.
 
 == API Reference
-{%#yaml:define api={%@include [verbatim] src/main/resources/openapi.yaml%}%}
-{%@yaml:format prettyFlow flowStyle=BLOCK%}
 
-{%@define endPoint($PATH, $METHOD)=
-==== {%@yaml:get (from=api) paths['$PATH'].$METHOD.summary%} `{%@case:upper $METHOD%} $PATH`
+The api can be categorized into two type of end-points:
 
-{%@yaml:get (from=api) paths['$PATH'].$METHOD.description%} %}
+* Service end point, and
+* Maintenance end points
 
-
-=== Service End Point
-
-{%endPoint|/axsg/permissions|get%}
-
-=== Maintenance End Points
+There is a single service endpoint, `/axsg/permissions`.
 
 Maintenance end-points are used to manage the service.
 To access these end-points, the client must have the appropriate permissions.
@@ -130,12 +123,20 @@ NOTE: The services implemented here could calculate the permissions based on the
 
 The maintenance end points provide the basic CRUD operations.
 
-{%endPoint|/axsg/acl/{name}|get%}
-{%endPoint|/axsg/acl/{name}|put%}
-{%endPoint|/axsg/put/acl/{name}|get%}
-{%endPoint|/axsg/acl|post%}
-{%endPoint|/axsg/post/acl|get%}
-{%endPoint|/axsg/acls/{name}|get%}
+
+{%#yaml:define api={%@include [verbatim] src/main/resources/openapi.yaml%}%}
+{%@yaml:format prettyFlow flowStyle=BLOCK%}
+
+{%@yaml:set paths=/api.paths%}
+
+{%!@for $path from paths=
+{%!@for $METHOD in (get,post,put)=
+{%#if|{%@yaml:get (from=api) (paths['$path'].$METHOD != null)%}|
+=== {%@case:upper $METHOD%} `$path`
+
+{%@yaml:get (from=api) (paths['$path'].$METHOD.description)%}
+%}
+%}%}
 
 == Configuration
 

@@ -9,19 +9,23 @@
             font-family: Arial, sans-serif;
             padding: 20px;
         }
+
         textarea {
             width: 100%;
             height: 150px;
             margin-bottom: 10px;
         }
+
         input, select, button {
             padding: 10px;
             margin-top: 10px;
             margin-right: 10px;
         }
+
         #urlInput {
             width: calc(100% - 22px); /* Adjust width to account for padding and border */
         }
+
         #headersInput {
             height: 100px; /* Slightly smaller for headers input */
         }
@@ -30,13 +34,19 @@
 <body>
 <h1>API Testing Tool</h1>
 <label for="urlInput">Enter URL:</label>
-<input type="text" id="urlInput" placeholder="http://localhost:3000/api">
+<input type="text" id="urlInput">
+<script>
+    document.getElementById('urlInput').value = window.location.origin + '/axsg/';
+</script>
 <br>
 <label for="jsonInput">Enter JSON:</label>
 <textarea id="jsonInput" placeholder='{"key": "value"}'></textarea>
 <br>
 <label for="headersInput">Enter Headers:</label>
 <textarea id="headersInput" placeholder='Content-Type: application/json\nAuthorization: Bearer token'></textarea>
+<script>
+    document.getElementById('headersInput').value = 'X-User-Id: user1';
+</script>
 <br>
 <label for="methodSelect">Select Method:</label>
 <select id="methodSelect">
@@ -61,6 +71,22 @@
             }
         });
         return headers;
+    }
+
+    function updateAuthorizationHeader(newAuthValue) {
+        const headersInput = document.getElementById('headersInput');
+        const headers = parseHeaders(headersInput.value);
+
+        // Update or add the Authorization header
+        headers['Authorization'] = `Bearer ${newAuthValue}`;
+
+        // Convert headers back to string
+        const updatedHeadersString = Object.entries(headers)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join('\n');
+
+        // Update the headers input field
+        headersInput.value = updatedHeadersString;
     }
 
     function sendRequest() {
@@ -88,24 +114,42 @@
 
         fetch(url, requestOptions)
             .then(response => {
-                // Extract headers and body from the response
+                // Extract headers from the response
                 const responseHeaders = Array.from(response.headers.entries());
                 const headersString = responseHeaders.map(([key, value]) => `${key}: ${value}`).join('\n');
 
-                return response.json().then(data => {
-                    // Display headers and body
-                    document.getElementById('responseOutput').textContent =
-                        `Headers:\n${headersString}\n\nBody:\n${JSON.stringify(data, null, 2)}`;
-                }).catch(() => {
-                    // If JSON parsing fails, still show headers and raw response
-                    return response.text().then(text => {
-                        document.getElementById('responseOutput').textContent =
-                            `Headers:\n${headersString}\n\nBody:\n${text}`;
-                    });
+                // Check for x-request-authorization header
+                const authHeader = response.headers.get('x-request-authorization');
+                if (authHeader) {
+                    updateAuthorizationHeader(authHeader);
+                }
+
+                const locationHeader = response.headers.get('Location');
+                if (locationHeader) {
+                    document.getElementById('urlInput').value = locationHeader;
+                }
+
+                // Prepare the output string
+                let output = `Status: ${response.status} ${response.statusText}\n\nHeaders:\n${headersString}\n\nBody:\n`;
+
+                // Try to parse as JSON, if fails, get as text
+                return response.text().then(text => {
+                    try {
+                        const jsonData = JSON.parse(text);
+                        output += JSON.stringify(jsonData, null, 2);
+                    } catch (e) {
+                        output += text;
+                        // Check if URL ends with /axsg/permissions and status is 200
+                        if (document.getElementById('urlInput').value.endsWith('/axsg/permissions') && response.status === 200) {
+                            // Assuming the JWT is directly in the response body
+                            updateAuthorizationHeader(text.trim());
+                        }
+                    }
+                    document.getElementById('responseOutput').textContent = output;
                 });
             })
             .catch(error => {
-                document.getElementById('responseOutput').textContent = `Error: ${error.message}`;
+                document.getElementById('responseOutput').textContent = `Network Error: ${error.message}`;
             });
     }
 </script>

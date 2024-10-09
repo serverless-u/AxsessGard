@@ -71,7 +71,7 @@ The set of role identifiers and the user name are taken into account calculating
 A user has a permission for an action `A` if there is an ACE in the ACL that
 
 * has the user's name or a role listed in the requesting JWT in the name field, and
-* the action `A` in the actions field.
+* the action `A` in the action field.
 
 It is the responsibility of the 3^rd^ party application:
 
@@ -85,22 +85,12 @@ It is the responsibility of the 3^rd^ party application:
 
 == API Reference
 
+The api can be categorized into two type of end-points:
 
+* Service end point, and
+* Maintenance end points
 
-
-
-
-=== Service End Point
-
-
-==== Get permissions `GET /axsg/permissions`
-
-Get the permissions, specifically the list of actions that a certain `user` bearing `roles` is allowed to perform on an object controlled by the `policy`.
-The `user`, `policy` and the list of `roles` are claims delivered by the JWT in the authentication header.
-The JWT has to be signed by one of the known applications configured in the application.
- 
-
-=== Maintenance End Points
+There is a single service endpoint, `/axsg/permissions`.
 
 Maintenance end-points are used to manage the service.
 To access these end-points, the client must have the appropriate permissions.
@@ -112,13 +102,39 @@ NOTE: The services implemented here could calculate the permissions based on the
 The maintenance end points provide the basic CRUD operations.
 
 
-==== Get ACL content `GET /axsg/acl/{name}`
+
+
+
+
+
+
+
+
+=== GET `/axsg/permissions`
+
+Get the permissions, specifically the list of actions that a certain `user` bearing `roles` is allowed to perform on an object controlled by the `policy`.
+The `user`, `policy` and the list of `roles` are claims delivered by the JWT in the authentication header.
+The JWT has to be signed by one of the known applications configured in the application.
+
+
+
+
+
+
+
+
+
+=== GET `/axsg/acl/{name}`
 
 Get the ACL content for a given `name`.
 The `name` is a unique identifier for the ACL content.
- 
 
-==== Update ACL content `PUT /axsg/acl/{name}`
+
+
+
+
+
+=== PUT `/axsg/acl/{name}`
 
 Update the ACL content for a given `name`.
 The `name` is a unique identifier for the ACL content.
@@ -126,34 +142,64 @@ The `ACL` object is passed in the request body.
 Note that the name in the new value may be different from the name in the path.
 This is the way how you can rename the ACL content.
 To perform the operation the client should have `write` permission on the ACL object.
- 
 
-==== Get ACL content `GET /axsg/put/acl/{name}`
 
-Signal an attempt to modify the ACL content for a given `name`.
-The call can be used to get the permission request JWT and the location without sending the actual ACL content.
-Authorization JWT in the request header is ignored.
- 
 
-==== Insert ACL content `POST /axsg/acl`
+
+
+
+
+=== POST `/axsg/acl`
 
 Insert the ACL content.
 The `ACL` object is passed in the request body.
 To perform the operation the client should have `create` permission in the `createAcl` ACL.
- 
 
-==== Get ACL content `GET /axsg/post/acl`
+
+
+
+
+
+
+=== GET `/axsg/put/acl/{name}`
+
+Signal an attempt to modify the ACL content for a given `name`.
+The call can be used to get the permission request JWT and the location without sending the actual ACL content.
+Authorization JWT in the request header is ignored.
+
+
+
+
+
+
+
+
+
+=== GET `/axsg/post/acl`
 
 Signal an attempt to create a new ACL content.
 The call can be used to get the permission request JWT and the location without sending the actual ACL content.
 Authorization JWT in the request header is ignored.
- 
 
-==== Get list of ACL names `GET /axsg/acls/{name}`
+
+
+
+
+
+
+
+
+=== GET `/axsg/acls/{name}`
 
 List all the ACLs that start with the given prefix `name`.
 To perform the operation the client should have `list` permission in the `listAcls` ACL.
- 
+
+
+
+
+
+
+
 
 == Configuration
 
@@ -264,7 +310,11 @@ ACL:FullAccess
 ACE:user2:read,write,delete
 ACE:ROLE_SUPERADMIN:read,write, delete,admin
 
+ACL:listAcls
+ACE:listAcls:list
 
+ACL:createAcl
+ACE:createAcl:create
 ----
 
 The file contains

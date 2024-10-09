@@ -2,13 +2,11 @@ openapi: 3.0.0
 info:
   title: AxsessGard API
   version: 1.0.0
-  license:
-    name: Apache 2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
+  license: {name: Apache 2.0, url: 'https://www.apache.org/licenses/LICENSE-2.0'}
   description: |
     AxsessGard is an access control microservice giving access control advices to other services.
     Applications protecting their assets can ask the client to get a signed JWT containing an access advice.
-    Based on the advice the application will or will not allow the access to the resource.
+    Based on the advice, the application will or will not allow the access to the resource.
 paths:
   /axsg/permissions:
     get:
@@ -18,21 +16,18 @@ paths:
         The `user`, `policy` and the list of `roles` are claims delivered by the JWT in the authentication header.
         The JWT has to be signed by one of the known applications configured in the application.
       operationId: getPermissions
-      tags:
-        - api
+      tags: [api]
       parameters:
-        - in: header
-          name: Authorization
-          required: true
-          schema:
-            type: string
+      - in: header
+        name: Authorization
+        required: true
+        schema: {type: string}
       responses:
         '200':
           description: Successful response
           content:
             application/json:
-              schema:
-                type: string
+              schema: {type: string}
   /axsg/acl/{name}:
     get:
       summary: Get ACL content
@@ -40,29 +35,24 @@ paths:
         Get the ACL content for a given `name`.
         The `name` is a unique identifier for the ACL content.
       operationId: getAcl
-      tags:
-        - api
+      tags: [api]
       parameters:
-        - in: path
-          name: name
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: x-user-id
-          schema:
-            type: string
-        - in: header
-          name: Authorization
-          schema:
-            type: string
+      - in: path
+        name: name
+        required: true
+        schema: {type: string}
+      - in: header
+        name: x-user-id
+        schema: {type: string}
+      - in: header
+        name: Authorization
+        schema: {type: string}
       responses:
         '200':
           description: Successful response
           content:
             application/json:
-              schema:
-                type: string
+              schema: {type: string}
     delete:
       summary: Delete ACL
       description: |
@@ -70,29 +60,24 @@ paths:
         The `name` is a unique identifier for the ACL content.
         To perform the operation the client should have `delete` permission on the ACL object.
       operationId: deleteAcl
-      tags:
-        - api
+      tags: [api]
       parameters:
-        - in: path
-          name: name
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: x-user-id
-          schema:
-            type: string
-        - in: header
-          name: Authorization
-          schema:
-            type: string
+      - in: path
+        name: name
+        required: true
+        schema: {type: string}
+      - in: header
+        name: x-user-id
+        schema: {type: string}
+      - in: header
+        name: Authorization
+        schema: {type: string}
       responses:
         '200':
           description: Successful response
           content:
             application/json:
-              schema:
-                type: string
+              schema: {type: string}
     put:
       summary: Update ACL content
       description: |
@@ -103,38 +88,29 @@ paths:
         This is the way how you can rename the ACL content.
         To perform the operation the client should have `write` permission on the ACL object.
       operationId: putAcl
-      tags:
-        - api
+      tags: [api]
       parameters:
-        - in: header
-          name: x-user-id
-          required: false
-          schema:
-            type: string
-        - in: header
-          name: Authorization
-          required: false
-          schema:
-            type: string
-        - in: path
-          name: name
-          required: true
-          schema:
-            type: string
+      - in: path
+        name: name
+        required: true
+        schema: {type: string}
+      - in: header
+        name: x-user-id
+        schema: {type: string}
+      - in: header
+        name: Authorization
+        schema: {type: string}
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              description: ACL object
+            schema: {type: object, description: ACL object}
       responses:
         '200':
           description: Successful response
           content:
             application/json:
-              schema:
-                type: string
+              schema: {type: string}
   /axsg/acl:
     post:
       summary: Insert ACL content
@@ -143,31 +119,25 @@ paths:
         Insert the ACL content.
         The `ACL` object is passed in the request body.
         To perform the operation the client should have `create` permission in the `createAcl` ACL.
-      tags:
-        - api
+      tags: [api]
       parameters:
-        - in: header
-          name: x-user-id
-          schema:
-            type: string
-        - in: header
-          name: Authorization
-          schema:
-            type: string
+      - in: header
+        name: x-user-id
+        schema: {type: string}
+      - in: header
+        name: Authorization
+        schema: {type: string}
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              description: ACL object
+            schema: {type: object, description: ACL object}
       responses:
         '200':
           description: Successful response
           content:
             application/json:
-              schema:
-                type: string
+              schema: {type: string}
   /axsg/put/acl/{name}:
     get:
       summary: Get ACL content
@@ -176,27 +146,22 @@ paths:
         The call can be used to get the permission request JWT and the location without sending the actual ACL content.
         Authorization JWT in the request header is ignored.
       operationId: getPutPermission
-      tags:
-        - api
+      tags: [api]
       parameters:
-        - in: path
-          name: name
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: x-user-id
-          required: false
-          description: the user id of the client
-          schema:
-            type: string
+      - in: path
+        name: name
+        required: true
+        schema: {type: string}
+      - in: header
+        name: x-user-id
+        required: false
+        schema: {type: string}
       responses:
         '200':
-          description: The modification of the ACL  does not need any extra permission
+          description: Successful response
           content:
             application/json:
-              schema:
-                type: string
+              schema: {type: string}
   /axsg/post/acl:
     get:
       summary: Get ACL content
@@ -205,22 +170,18 @@ paths:
         Signal an attempt to create a new ACL content.
         The call can be used to get the permission request JWT and the location without sending the actual ACL content.
         Authorization JWT in the request header is ignored.
-      tags:
-        - api
+      tags: [api]
       parameters:
-        - in: header
-          name: x-user-id
-          required: false
-          schema:
-            type: string
+      - in: header
+        name: x-user-id
+        required: false
+        schema: {type: string}
       responses:
         '200':
           description: Successful response
           content:
             application/json:
-              schema:
-                type: string
-
+              schema: {type: string}
   /axsg/acls/{name}:
     get:
       summary: Get list of ACL names
@@ -228,28 +189,23 @@ paths:
         List all the ACLs that start with the given prefix `name`.
         To perform the operation the client should have `list` permission in the `listAcls` ACL.
       operationId: getAcls
-      tags:
-        - api
+      tags: [api]
       parameters:
-        - in: header
-          name: Authorization
-          schema:
-            type: string
-        - in: path
-          name: name
-          required: true
-          schema:
-            type: string
-        - in: header
-          name: x-user-id
-          required: false
-          description: the user id of the client
-          schema:
-            type: string
+      - in: header
+        name: Authorization
+        schema: {type: string}
+      - in: path
+        name: name
+        required: true
+        schema: {type: string}
+      - in: header
+        name: x-user-id
+        required: false
+        description: the user id of the client
+        schema: {type: string}
       responses:
         '200':
-          description: The modification of the ACL  does not need any extra permission
+          description: Successful response
           content:
             application/json:
-              schema:
-                type: string
+              schema: {type: string}
